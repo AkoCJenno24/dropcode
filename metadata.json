@@ -1,0 +1,6 @@
+{
+  "name": "DropCode",
+  "description": "Fast, temporary code-based file sharing between devices without accounts or setup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
