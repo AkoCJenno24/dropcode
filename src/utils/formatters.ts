@@ -19,14 +19,11 @@ export function formatBytes(bytes: number, decimals = 1): string {
 }
 
 export function formatCode(code: string): string {
-  const clean = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  if (clean.length === 6) {
+  const clean = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
+  if (clean.length > 3) {
     return `${clean.slice(0, 3)}-${clean.slice(3)}`;
   }
-  if (clean.length === 8) {
-    return `${clean.slice(0, 4)}-${clean.slice(4)}`;
-  }
-  return code.toUpperCase();
+  return clean;
 }
 
 export function formatSeconds(seconds: number): string {

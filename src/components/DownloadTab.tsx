@@ -159,12 +159,12 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
             <div className="relative max-w-xs mx-auto">
               <input
                 type="text"
-                maxLength={6}
-                value={code}
+                maxLength={7}
+                value={formatCode(code)}
                 onChange={handleCodeChange}
-                placeholder="X7KP9M"
+                placeholder="X7K-P9M"
                 disabled={isSearching}
-                className="w-full text-center font-mono text-3xl font-black uppercase tracking-[0.3em] py-4 px-4 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300 placeholder:tracking-[0.2em] bg-slate-50/50 text-slate-900"
+                className="w-full text-center font-mono text-3xl font-black uppercase tracking-[0.2em] py-4 px-4 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300 placeholder:tracking-[0.2em] bg-slate-50/50 text-slate-900"
                 aria-label="6-character transfer code input"
               />
             </div>
