@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UploadCloud, DownloadCloud, ShieldCheck, Zap, Lock, Sparkles } from 'lucide-react';
+import { UploadCloud, DownloadCloud, ShieldCheck, Zap, Lock, Sparkles, Smartphone, ArrowRight } from 'lucide-react';
 import { Header } from './components/Header';
 import { UploadTab } from './components/UploadTab';
 import { DownloadTab } from './components/DownloadTab';
 import { HowItWorksModal } from './components/HowItWorksModal';
 import { RecentTransfers, SavedTransferItem } from './components/RecentTransfers';
 import { FileTransferMeta } from './types';
-
 import { transferService } from './services/transferService';
+import { ToastProvider } from './components/Toast';
 
-export default function App() {
+export function AppContent() {
   const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
   const [downloadCode, setDownloadCode] = useState<string>('');
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
@@ -32,7 +32,7 @@ export default function App() {
       }
 
       if (foundCode) {
-        setDownloadCode(foundCode.replace(/\D/g, ''));
+        setDownloadCode(foundCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase());
         setActiveTab('download');
       }
     };
@@ -101,8 +101,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100/60 to-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-12">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-600 selection:text-white pb-16">
+      {/* Navigation Header */}
       <Header
         onOpenHowItWorks={() => setHowItWorksOpen(true)}
         activeCount={activeCount}
@@ -110,27 +110,29 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 w-full max-w-xl mx-auto px-4 flex flex-col justify-center">
-        {/* Sub-header tagline */}
-        <div className="text-center mb-6 space-y-1.5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100/80 mb-1">
+        {/* Landing Page Hero Section */}
+        <section className="text-center mb-8 space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100/90 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            No accounts required • 100% Free
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-            Send files anywhere in <span className="text-indigo-600">seconds</span>
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-            Temporary peer transfers with auto-deleting 6-digit codes.
-          </p>
-        </div>
+            <span>No login • No app • No email</span>
+          </div>
 
-        {/* Tab Switcher */}
-        <div className="bg-slate-200/70 p-1.5 rounded-2xl flex items-center mb-6 border border-slate-300/60 shadow-inner">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.15]">
+            Transfer files between your devices <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">instantly</span>
+          </h2>
+
+          <p className="text-xs sm:text-sm md:text-base text-slate-500 max-w-lg mx-auto leading-relaxed font-medium">
+            Upload your file, enter the 6-character code, and download it from any device in seconds.
+          </p>
+        </section>
+
+        {/* Primary/Secondary CTA Tab Switcher */}
+        <div className="bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-6 border border-slate-300/60 shadow-inner">
           <button
             onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`flex-1 py-3.5 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
               activeTab === 'upload'
-                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50'
+                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/60 ring-1 ring-slate-900/5'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -140,9 +142,9 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('download')}
-            className={`flex-1 py-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`flex-1 py-3.5 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
               activeTab === 'download'
-                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50'
+                ? 'bg-white text-slate-900 shadow-md shadow-slate-200/60 ring-1 ring-slate-900/5'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -151,15 +153,15 @@ export default function App() {
           </button>
         </div>
 
-        {/* Active Tab Area */}
+        {/* Active Tab Component */}
         <AnimatePresence mode="wait">
           {activeTab === 'upload' ? (
             <motion.div
               key="upload"
-              initial={{ opacity: 0, x: -10 }}
+              initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.2 }}
             >
               <UploadTab
                 onUploadSuccess={(fileMeta) => saveToHistory('upload', fileMeta)}
@@ -168,10 +170,10 @@ export default function App() {
           ) : (
             <motion.div
               key="download"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
             >
               <DownloadTab
                 initialCode={downloadCode}
@@ -181,7 +183,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Recent Transfer Items on Device */}
+        {/* Device History List */}
         <RecentTransfers
           items={historyItems}
           onSelectCode={handleSelectCodeFromHistory}
@@ -190,17 +192,19 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 text-center text-xs text-slate-400 space-y-2">
-        <div className="flex items-center justify-center gap-4 text-slate-500 font-medium">
-          <span className="flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> 30-min Auto Expiration
+      <footer className="mt-16 text-center text-xs text-slate-400 space-y-3 px-4">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-slate-500 font-semibold text-xs">
+          <span className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" /> 30-min Auto Expiration
           </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <Lock className="w-3.5 h-3.5 text-indigo-600" /> Encrypted Endpoint
+          <span className="hidden sm:inline">•</span>
+          <span className="flex items-center gap-1.5">
+            <Lock className="w-4 h-4 text-indigo-600" /> Encrypted Endpoint
           </span>
-          <span>•</span>
-          <span>Max 100 MB</span>
+          <span className="hidden sm:inline">•</span>
+          <span className="flex items-center gap-1.5">
+            <Smartphone className="w-4 h-4 text-violet-600" /> iOS & Android Ready
+          </span>
         </div>
         <p>© {new Date().getFullYear()} DropCode. Built for effortless cross-device sharing.</p>
       </footer>
@@ -211,5 +215,13 @@ export default function App() {
         onClose={() => setHowItWorksOpen(false)}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }

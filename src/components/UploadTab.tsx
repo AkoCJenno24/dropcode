@@ -11,21 +11,25 @@ import {
   Share2,
   Trash2,
   ArrowRight,
-  ExternalLink,
+  ShieldCheck,
+  Lock,
+  Sparkles,
+  Smartphone,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatBytes, formatCode, getFileTypeInfo } from '../utils/formatters';
 import { ExpirationTimer } from './ExpirationTimer';
-import { FileTransferMeta, UploadResponse } from '../types';
+import { FileTransferMeta } from '../types';
 import { validateUploadFile } from '../utils/fileValidation';
-
 import { transferService } from '../services/transferService';
+import { useToast } from './Toast';
 
 interface UploadTabProps {
   onUploadSuccess?: (fileMeta: FileTransferMeta) => void;
 }
 
 export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
+  const { showToast } = useToast();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -46,11 +50,14 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
     const validation = validateUploadFile(file);
     if (!validation.valid) {
-      setErrorMsg(validation.error || 'Invalid file.');
+      const msg = validation.error || 'Invalid file.';
+      setErrorMsg(msg);
+      showToast(msg, undefined, 'error');
       return;
     }
 
     setSelectedFile(file);
+    showToast('File selected', `${file.name} (${formatBytes(file.size)})`, 'info');
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -74,7 +81,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
   };
 
   const startUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || isUploading) return;
 
     setIsUploading(true);
     setUploadProgress(10);
@@ -89,13 +96,18 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
       if (res.success && res.file) {
         setUploadedFile(res.file);
+        showToast('Upload Complete!', `Transfer code: ${formatCode(res.file.code)}`, 'success');
         if (onUploadSuccess) onUploadSuccess(res.file);
       } else {
-        setErrorMsg(res.error || 'Failed to upload file.');
+        const msg = res.error || 'Failed to upload file.';
+        setErrorMsg(msg);
+        showToast('Upload Failed', msg, 'error');
       }
     } catch (err: any) {
       setIsUploading(false);
-      setErrorMsg(err?.message || 'Error occurred during upload.');
+      const msg = err?.message || 'Error occurred during upload.';
+      setErrorMsg(msg);
+      showToast('Upload Error', msg, 'error');
     }
   };
 
@@ -113,8 +125,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
   const copyCode = () => {
     if (!uploadedFile) return;
-    navigator.clipboard.writeText(uploadedFile.code);
+    const formatted = formatCode(uploadedFile.code);
+    navigator.clipboard.writeText(formatted);
     setCopiedCode(true);
+    showToast('Code Copied!', `${formatted} saved to clipboard`, 'success');
     setTimeout(() => setCopiedCode(false), 2500);
   };
 
@@ -126,6 +140,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
     if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
+    showToast('Link Copied!', 'Direct download URL copied to clipboard', 'success');
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
@@ -136,17 +151,17 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, scale: 0.98, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.25 }}
         className="bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/40 p-6 sm:p-8 space-y-6"
       >
         {/* Success Header */}
         <div className="text-center space-y-1">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-2">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 mb-2 shadow-sm ring-4 ring-emerald-50">
             <Check className="w-6 h-6 stroke-[2.5]" />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
             Ready to Transfer!
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
@@ -154,23 +169,23 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
           </p>
         </div>
 
-        {/* Big Code Card */}
-        <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/50 rounded-2xl border border-indigo-100/80 p-6 text-center shadow-inner space-y-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600/90">
-            Transfer Code
-          </span>
+        {/* Transfer Code Card */}
+        <div className="bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/60 rounded-3xl border border-indigo-100 p-6 text-center shadow-inner space-y-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100/70 text-indigo-700 text-[11px] font-bold uppercase tracking-wider">
+            <Sparkles className="w-3 h-3 text-indigo-600" /> Transfer Code
+          </div>
 
-          <div className="font-mono text-4xl sm:text-5xl font-black text-slate-900 tracking-widest my-1 select-all">
+          <div className="font-mono text-4xl sm:text-5xl font-black text-slate-900 tracking-widest my-1 select-all focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg p-1">
             {formatCode(uploadedFile.code)}
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button
               onClick={copyCode}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
                 copiedCode
                   ? 'bg-emerald-600 text-white shadow-emerald-500/20'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/25'
               }`}
             >
               {copiedCode ? (
@@ -186,10 +201,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
             <button
               onClick={copyLink}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
                 copiedLink
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-xs'
               }`}
             >
               {copiedLink ? (
@@ -205,14 +220,14 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
             <button
               onClick={() => setShowQr(!showQr)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-all cursor-pointer shadow-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             >
               <QrCode className="w-4 h-4 text-slate-500" />
               <span>{showQr ? 'Hide QR' : 'QR Code'}</span>
             </button>
           </div>
 
-          {/* QR Code toggle box */}
+          {/* Collapsible QR Code */}
           <AnimatePresence>
             {showQr && (
               <motion.div
@@ -221,25 +236,25 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
                 exit={{ opacity: 0, height: 0 }}
                 className="pt-4 flex flex-col items-center justify-center overflow-hidden"
               >
-                <div className="p-3 bg-white rounded-xl shadow-md border border-slate-200">
-                  <QRCodeSVG value={shareUrl} size={150} level="M" />
+                <div className="p-4 bg-white rounded-2xl shadow-md border border-slate-200/80">
+                  <QRCodeSVG value={shareUrl} size={160} level="M" />
                 </div>
-                <span className="text-[11px] text-slate-500 mt-2 font-medium">
-                  Scan with your mobile camera to open direct download
+                <span className="text-[11px] text-slate-500 mt-2 font-semibold">
+                  Scan with camera to open direct download
                 </span>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* File summary */}
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs">
+        {/* File Details Summary */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`p-2.5 rounded-xl border ${fileTypeInfo.color}`}>
+            <div className={`p-3 rounded-xl border ${fileTypeInfo.color}`}>
               <TypeIcon className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <span className="font-semibold text-slate-900 truncate block">
+              <span className="font-bold text-slate-900 truncate block text-xs sm:text-sm">
                 {uploadedFile.originalName}
               </span>
               <span className="text-slate-500 text-[11px]">
@@ -247,23 +262,41 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
               </span>
             </div>
           </div>
+
+          {/* Security badge slot */}
+          <div className="hidden xs:flex items-center gap-1 text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Verified
+          </div>
         </div>
 
-        {/* Expiration Timer */}
+        {/* Live Expiration Countdown */}
         <ExpirationTimer
           expiresAt={uploadedFile.expiresAt}
           onExpired={() => {
             setErrorMsg('This transfer code has expired.');
+            showToast('Transfer Expired', 'The transfer code has reached its 30-minute limit.', 'warning');
           }}
         />
+
+        {/* Future Extensibility UI Slot Indicators */}
+        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <span>Passcode protection: Off</span>
+          </div>
+          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+            <span>P2P Direct link: Ready</span>
+          </div>
+        </div>
 
         {/* Reset / Action Buttons */}
         <div className="pt-2 flex items-center justify-between border-t border-slate-100">
           <button
             onClick={resetUpload}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Send Another File
+            <RefreshCw className="w-4 h-4 text-indigo-600" /> Send Another File
           </button>
         </div>
       </motion.div>
@@ -286,7 +319,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
       />
 
       {errorMsg && (
-        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2.5">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2.5 shadow-xs">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
@@ -299,43 +332,53 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
           onDragLeave={handleDrag}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-4 ${
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-4 focus:outline-none focus:ring-4 focus:ring-indigo-100 ${
             dragActive
-              ? 'border-indigo-500 bg-indigo-50/60 scale-[1.01]'
-              : 'border-slate-300 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50'
+              ? 'border-indigo-600 bg-indigo-50/70 scale-[1.01] shadow-lg shadow-indigo-500/10'
+              : 'border-slate-300 hover:border-indigo-500 bg-slate-50/50 hover:bg-slate-50'
           }`}
+          role="button"
+          aria-label="File upload dropzone. Click or drag a file to upload."
         >
-          <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-50 to-indigo-100 text-indigo-600 border border-indigo-200/80 flex items-center justify-center shadow-sm">
             <UploadCloud className="w-8 h-8 stroke-[1.8]" />
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-900">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
               Drag & drop your file here, or{' '}
-              <span className="text-indigo-600 hover:underline">browse</span>
+              <span className="text-indigo-600 underline underline-offset-4 decoration-indigo-300">browse</span>
             </h3>
-            <p className="text-xs text-slate-500">
-              Any file type (Images, PDFs, Videos, Zips) up to <strong className="text-slate-700 font-semibold">100 MB</strong>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              Supports Documents, Images, Archives & Videos up to <strong className="text-slate-700 font-bold">100 MB</strong>
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/60 text-slate-600 text-[11px] font-medium mt-1">
-            <span>🔒 Files auto-expire in 30 minutes</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-200/70 text-slate-700 text-[11px] font-semibold mt-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Files automatically expire after 30 minutes</span>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* File Selected Preview */}
-          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/80 flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
+          {/* File Selected Card */}
+          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3.5 min-w-0">
               <div className={`p-3 rounded-xl border ${typeInfo?.color}`}>
                 <SelectedIcon className="w-6 h-6" />
               </div>
               <div className="min-w-0">
-                <h4 className="text-sm font-bold text-slate-900 truncate">
+                <h4 className="text-sm font-extrabold text-slate-900 truncate">
                   {selectedFile.name}
                 </h4>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 font-medium">
                   {formatBytes(selectedFile.size)} • {typeInfo?.badge}
                 </p>
               </div>
@@ -344,8 +387,9 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
             {!isUploading && (
               <button
                 onClick={() => setSelectedFile(null)}
-                className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Remove file"
+                className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                title="Remove selected file"
+                aria-label="Remove selected file"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -354,25 +398,26 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
           {/* Upload Progress Bar */}
           {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-700">
-                <span>Uploading file...</span>
+            <div className="space-y-2.5">
+              <div className="flex justify-between text-xs font-bold text-slate-800">
+                <span>Uploading to secure storage...</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/60">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 transition-all duration-200 rounded-full"
+                  className="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 transition-all duration-200 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
             </div>
           )}
 
-          {/* Action Button */}
+          {/* Generate Transfer Code CTA Button */}
           {!isUploading && (
             <button
               onClick={startUpload}
-              className="w-full py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/35 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isUploading}
+              className="w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/35 transition-all flex items-center justify-center gap-2 cursor-pointer focus:ring-4 focus:ring-indigo-100 focus:outline-none disabled:opacity-50"
             >
               <span>Generate Transfer Code</span>
               <ArrowRight className="w-4 h-4" />

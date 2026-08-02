@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { FileTransferMeta, SecurityContext } from '../types';
 import { generateTransferCode } from '../utils/codeGenerator';
-import { validateUploadFile } from '../utils/fileValidation';
+import { validateUploadFile, recordSessionUpload } from '../utils/fileValidation';
 
 const STORAGE_BUCKET = 'transfers';
 const TABLE_NAME = 'transfers';
@@ -36,7 +36,6 @@ export const transferService = {
    * Supports IP rate limits, Turnstile / reCAPTCHA validation in future extensions
    */
   async verifyAbuseLimits(_context?: SecurityContext): Promise<{ allowed: boolean; error?: string }> {
-    // Structural hook ready for Cloudflare Turnstile / IP rate limiting integrations
     return { allowed: true };
   },
 
@@ -140,6 +139,8 @@ export const transferService = {
 
         if (onProgress) onProgress(100);
 
+        recordSessionUpload(file);
+
         const meta: FileTransferMeta = {
           code,
           originalName: file.name,
@@ -174,6 +175,7 @@ export const transferService = {
     };
 
     fallbackRegistry.set(code, { meta, blob: file });
+    recordSessionUpload(file);
 
     if (onProgress) onProgress(100);
 
@@ -185,7 +187,7 @@ export const transferService = {
    */
   async getFileInfo(
     code: string
-  ): Promise<{ success: boolean; file?: FileTransferMeta; error?: string }> {
+  ): Promise<{ success: boolean; file?: FileTransferMeta; meta?: FileTransferMeta; error?: string }> {
     const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     if (isSupabaseConfigured && supabase) {
@@ -229,7 +231,7 @@ export const transferService = {
           status: data.status,
         };
 
-        return { success: true, file: meta };
+        return { success: true, file: meta, meta };
       } catch (err: any) {
         return { success: false, error: err?.message || 'Error fetching file metadata.' };
       }
@@ -246,7 +248,14 @@ export const transferService = {
       return { success: false, error: 'This file transfer has expired.' };
     }
 
-    return { success: true, file: item.meta };
+    return { success: true, file: item.meta, meta: item.meta };
+  },
+
+  /**
+   * Alias for getFileInfo
+   */
+  async getTransferMeta(code: string) {
+    return this.getFileInfo(code);
   },
 
   /**
@@ -313,6 +322,42 @@ export const transferService = {
 
     const url = URL.createObjectURL(item.blob);
     return { success: true, url };
+  },
+
+  /**
+   * Complete download process with progress tracking
+   */
+  async downloadFile(
+    code: string,
+    onProgress?: (percentage: number) => void
+  ): Promise<{ success: boolean; error?: string }> {
+    if (onProgress) onProgress(20);
+
+    const res = await this.getDownloadUrl(code);
+    if (!res.success || !res.url) {
+      return { success: false, error: res.error || 'Failed to retrieve download link.' };
+    }
+
+    if (onProgress) onProgress(60);
+
+    try {
+      // Trigger file download using temporary anchor tag
+      const metaRes = await this.getFileInfo(code);
+      const filename = metaRes.meta?.originalName || `dropcode_${code}.bin`;
+
+      const link = document.createElement('a');
+      link.href = res.url;
+      link.download = filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      if (onProgress) onProgress(100);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed to initiate download.' };
+    }
   },
 
   /**
