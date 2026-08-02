@@ -20,7 +20,10 @@ export function formatBytes(bytes: number, decimals = 1): string {
 
 export function formatCode(code: string): string {
   const clean = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
-  if (clean.length > 3) {
+  if (clean.length >= 3) {
+    if (clean.length === 3) {
+      return `${clean}-`;
+    }
     return `${clean.slice(0, 3)}-${clean.slice(3)}`;
   }
   return clean;

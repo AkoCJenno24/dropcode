@@ -58,6 +58,17 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && code.length === 3) {
+      const target = e.currentTarget;
+      // If cursor is at the end or right after the hyphen
+      if (target.selectionStart === target.selectionEnd) {
+        e.preventDefault();
+        setCode((prev) => prev.slice(0, 2));
+      }
+    }
+  };
+
   const fetchFileMeta = async (targetCode: string) => {
     const cleanCode = targetCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     if (!cleanCode || cleanCode.length < 6) {
@@ -162,6 +173,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
                 maxLength={7}
                 value={formatCode(code)}
                 onChange={handleCodeChange}
+                onKeyDown={handleKeyDown}
                 placeholder="X7K-P9M"
                 disabled={isSearching}
                 className="w-full text-center font-mono text-3xl font-black uppercase tracking-[0.2em] py-4 px-4 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300 placeholder:tracking-[0.2em] bg-slate-50/50 text-slate-900"
