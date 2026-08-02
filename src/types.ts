@@ -1,3 +1,5 @@
+export type TransferStatus = 'active' | 'expired' | 'deleted' | 'failed';
+
 export interface FileTransferMeta {
   code: string;
   originalName: string;
@@ -6,12 +8,14 @@ export interface FileTransferMeta {
   uploadTime: number;
   expiresAt: number;
   downloadsCount?: number;
+  lastDownloadedAt?: number | null;
+  status?: TransferStatus;
 }
 
 export interface UploadResponse {
   success: boolean;
-  code: string;
-  file: FileTransferMeta;
+  code?: string;
+  file?: FileTransferMeta;
   error?: string;
 }
 
@@ -20,3 +24,10 @@ export interface FileInfoResponse {
   file?: FileTransferMeta;
   error?: string;
 }
+
+// Abuse protection & Security extensions context
+export interface SecurityContext {
+  clientIp?: string;
+  captchaToken?: string;
+}
+

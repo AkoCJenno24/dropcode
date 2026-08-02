@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatBytes, formatCode, getFileTypeInfo } from '../utils/formatters';
 import { ExpirationTimer } from './ExpirationTimer';
 import { FileTransferMeta, UploadResponse } from '../types';
+import { validateUploadFile } from '../utils/fileValidation';
 
 import { transferService } from '../services/transferService';
 
@@ -39,14 +40,13 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-
   const handleFileChange = (file: File | null) => {
     setErrorMsg(null);
     if (!file) return;
 
-    if (file.size > MAX_SIZE) {
-      setErrorMsg(`File size exceeds 100 MB limit (${formatBytes(file.size)} selected).`);
+    const validation = validateUploadFile(file);
+    if (!validation.valid) {
+      setErrorMsg(validation.error || 'Invalid file.');
       return;
     }
 

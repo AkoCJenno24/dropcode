@@ -34,7 +34,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
 
   useEffect(() => {
     if (initialCode) {
-      const clean = initialCode.replace(/\D/g, '');
+      const clean = initialCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
       setCode(clean);
       if (clean.length === 6) {
         fetchFileInfo(clean);
@@ -43,9 +43,9 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
   }, [initialCode]);
 
   const fetchFileInfo = async (targetCode: string) => {
-    const cleanCode = targetCode.replace(/\D/g, '');
+    const cleanCode = targetCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     if (cleanCode.length < 6) {
-      setErrorMsg('Please enter a valid 6-digit transfer code.');
+      setErrorMsg('Please enter a valid 6-character transfer code.');
       return;
     }
 
@@ -69,7 +69,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
   };
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+    const val = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
     setCode(val);
     setErrorMsg(null);
     if (val.length === 6) {
@@ -139,7 +139,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
               Enter Transfer Code
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-              Enter the 6-digit code from your sending device to receive your file.
+              Enter the 6-character code from your sending device to receive your file.
             </p>
           </div>
 
@@ -150,18 +150,16 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
             </div>
           )}
 
-          {/* 6-digit code input presentation */}
+          {/* 6-character code input presentation */}
           <div className="space-y-4">
             <div className="relative max-w-xs mx-auto">
               <input
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
                 maxLength={6}
                 value={code}
                 onChange={handleCodeChange}
-                placeholder="000 000"
-                className="w-full text-center font-mono text-3xl font-extrabold tracking-[0.4em] py-4 px-4 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300 placeholder:tracking-[0.3em] bg-slate-50/50"
+                placeholder="X7KP9M"
+                className="w-full text-center font-mono text-3xl font-extrabold uppercase tracking-[0.3em] py-4 px-4 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300 placeholder:tracking-[0.2em] bg-slate-50/50"
               />
             </div>
 

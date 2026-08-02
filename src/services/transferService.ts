@@ -1,15 +1,29 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { FileTransferMeta } from '../types';
+import { FileTransferMeta, SecurityContext } from '../types';
+import { generateTransferCode } from '../utils/codeGenerator';
+import { validateUploadFile } from '../utils/fileValidation';
 
 const STORAGE_BUCKET = 'transfers';
-const TABLE_NAME = 'file_transfers';
+const TABLE_NAME = 'transfers';
+
+// Get configurable expiration minutes (default: 30)
+function getExpirationMinutes(): number {
+  const envVal = import.meta.env.VITE_TRANSFER_EXPIRATION_MINUTES;
+  const parsed = parseInt(envVal, 10);
+  return !isNaN(parsed) && parsed > 0 ? parsed : 30;
+}
 
 // In-memory / Local storage fallback state when Supabase env vars are empty
 const fallbackRegistry = new Map<string, { meta: FileTransferMeta; blob: Blob }>();
 
-function generateCode(): string {
-  const num = Math.floor(100000 + Math.random() * 900000);
-  return num.toString();
+// Generates a UUID-based storage path: uploads/YYYY/MM/{uuid}.ext
+function generateStoragePath(fileName: string): string {
+  const fileExt = fileName.split('.').pop() || 'bin';
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const uuid = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  return `uploads/${year}/${month}/${uuid}.${fileExt}`;
 }
 
 export const transferService = {
@@ -17,27 +31,52 @@ export const transferService = {
     return isSupabaseConfigured;
   },
 
+  /**
+   * Abuse protection hook placeholder
+   * Supports IP rate limits, Turnstile / reCAPTCHA validation in future extensions
+   */
+  async verifyAbuseLimits(_context?: SecurityContext): Promise<{ allowed: boolean; error?: string }> {
+    // Structural hook ready for Cloudflare Turnstile / IP rate limiting integrations
+    return { allowed: true };
+  },
+
+  /**
+   * Upload file to Supabase Storage & Database
+   */
   async uploadFile(
     file: File,
-    onProgress?: (percentage: number) => void
+    onProgress?: (percentage: number) => void,
+    securityContext?: SecurityContext
   ): Promise<{ success: boolean; code?: string; file?: FileTransferMeta; error?: string }> {
-    const code = generateCode();
+    // 1. Strict File Validation (Max 100MB, restricted executable extensions)
+    const validation = validateUploadFile(file);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    // 2. Check Abuse Protection limits
+    const abuseCheck = await this.verifyAbuseLimits(securityContext);
+    if (!abuseCheck.allowed) {
+      return { success: false, error: abuseCheck.error || 'Upload request blocked by security limits.' };
+    }
+
+    const expirationMinutes = getExpirationMinutes();
     const now = Date.now();
-    const EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
-    const expiresAt = now + EXPIRATION_MS;
+    const expiresAtMs = now + expirationMinutes * 60 * 1000;
+    const expiresAtIso = new Date(expiresAtMs).toISOString();
+    const createdAtIso = new Date(now).toISOString();
 
     if (onProgress) onProgress(10);
 
     // Real Supabase backend execution
     if (isSupabaseConfigured && supabase) {
       try {
-        const fileExt = file.name.split('.').pop() || '';
-        const storagePath = `${code}_${now}.${fileExt}`;
+        const storagePath = generateStoragePath(file.name);
 
         if (onProgress) onProgress(30);
 
         // Upload to Supabase Storage bucket 'transfers'
-        const { data: storageData, error: storageError } = await supabase.storage
+        const { error: storageError } = await supabase.storage
           .from(STORAGE_BUCKET)
           .upload(storagePath, file, {
             cacheControl: '3600',
@@ -46,34 +85,56 @@ export const transferService = {
 
         if (storageError) {
           console.error('Supabase Storage error:', storageError);
-          // If bucket doesn't exist, provide helpful message
           if (storageError.message.includes('not found') || storageError.message.includes('Bucket')) {
             return {
               success: false,
-              error: `Supabase bucket '${STORAGE_BUCKET}' not found. Please create a storage bucket named '${STORAGE_BUCKET}' in Supabase Dashboard.`,
+              error: `Supabase storage bucket '${STORAGE_BUCKET}' not found. Please create the '${STORAGE_BUCKET}' bucket in your Supabase project.`,
             };
           }
           return { success: false, error: storageError.message };
         }
 
-        if (onProgress) onProgress(70);
+        if (onProgress) onProgress(75);
 
-        // Insert metadata into Supabase PostgreSQL table 'file_transfers'
+        // Generate cryptographically unique 6-character transfer code
+        let code = generateTransferCode(6);
+        let attempts = 0;
+        let isUnique = false;
+
+        while (!isUnique && attempts < 5) {
+          const { data: existing } = await supabase
+            .from(TABLE_NAME)
+            .select('id')
+            .eq('transfer_code', code)
+            .single();
+
+          if (!existing) {
+            isUnique = true;
+          } else {
+            code = generateTransferCode(6);
+            attempts++;
+          }
+        }
+
+        // Insert metadata into Supabase PostgreSQL table 'transfers'
         const { error: dbError } = await supabase.from(TABLE_NAME).insert([
           {
-            code,
-            original_name: file.name,
+            transfer_code: code,
+            filename: file.name,
             mime_type: file.type || 'application/octet-stream',
-            size: file.size,
+            file_size: file.size,
             storage_path: storagePath,
-            upload_time: now,
-            expires_at: expiresAt,
-            downloads_count: 0,
+            created_at: createdAtIso,
+            expires_at: expiresAtIso,
+            download_count: 0,
+            status: 'active',
           },
         ]);
 
         if (dbError) {
           console.error('Supabase DB Insert error:', dbError);
+          // Rollback storage file on DB insertion failure
+          await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
           return { success: false, error: dbError.message };
         }
 
@@ -85,28 +146,31 @@ export const transferService = {
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
           uploadTime: now,
-          expiresAt,
+          expiresAt: expiresAtMs,
           downloadsCount: 0,
+          status: 'active',
         };
 
         return { success: true, code, file: meta };
       } catch (err: any) {
         console.error('Supabase Upload error:', err);
-        return { success: false, error: err?.message || 'Failed uploading to Supabase.' };
+        return { success: false, error: err?.message || 'Failed uploading file to Supabase.' };
       }
     }
 
-    // Local Client Fallback (When Supabase keys are not set yet)
+    // Local Client Fallback Mode (when Supabase environment credentials are not set)
     if (onProgress) onProgress(60);
 
+    const code = generateTransferCode(6);
     const meta: FileTransferMeta = {
       code,
       originalName: file.name,
       mimeType: file.type || 'application/octet-stream',
       size: file.size,
       uploadTime: now,
-      expiresAt,
+      expiresAt: expiresAtMs,
       downloadsCount: 0,
+      status: 'active',
     };
 
     fallbackRegistry.set(code, { meta, blob: file });
@@ -116,39 +180,53 @@ export const transferService = {
     return { success: true, code, file: meta };
   },
 
+  /**
+   * Fetch transfer metadata by transfer code
+   */
   async getFileInfo(
     code: string
   ): Promise<{ success: boolean; file?: FileTransferMeta; error?: string }> {
-    const cleanCode = code.replace(/\D/g, '');
+    const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
-    // Real Supabase backend execution
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from(TABLE_NAME)
           .select('*')
-          .eq('code', cleanCode)
+          .eq('transfer_code', cleanCode)
           .single();
 
         if (error || !data) {
-          return { success: false, error: 'Transfer code not found or expired.' };
+          return { success: false, error: 'Transfer code not found or file expired.' };
         }
 
-        if (Date.now() >= Number(data.expires_at)) {
-          // Clean up expired record
-          await supabase.from(TABLE_NAME).delete().eq('code', cleanCode);
-          await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
-          return { success: false, error: 'This file transfer has expired.' };
+        const expiresAtMs = new Date(data.expires_at).getTime();
+        const createdAtMs = new Date(data.created_at).getTime();
+        const lastDownloadedAtMs = data.last_downloaded_at ? new Date(data.last_downloaded_at).getTime() : null;
+
+        if (data.status !== 'active' || Date.now() >= expiresAtMs) {
+          // Update status to expired
+          if (data.status === 'active') {
+            await supabase
+              .from(TABLE_NAME)
+              .update({ status: 'expired' })
+              .eq('transfer_code', cleanCode);
+
+            await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
+          }
+          return { success: false, error: 'This file transfer has expired or been deleted.' };
         }
 
         const meta: FileTransferMeta = {
-          code: data.code,
-          originalName: data.original_name,
+          code: data.transfer_code,
+          originalName: data.filename,
           mimeType: data.mime_type,
-          size: Number(data.size),
-          uploadTime: Number(data.upload_time),
-          expiresAt: Number(data.expires_at),
-          downloadsCount: Number(data.downloads_count || 0),
+          size: Number(data.file_size),
+          uploadTime: createdAtMs,
+          expiresAt: expiresAtMs,
+          downloadsCount: Number(data.download_count || 0),
+          lastDownloadedAt: lastDownloadedAtMs,
+          status: data.status,
         };
 
         return { success: true, file: meta };
@@ -171,45 +249,52 @@ export const transferService = {
     return { success: true, file: item.meta };
   },
 
+  /**
+   * Generate signed download URL and update download count & last_downloaded_at
+   */
   async getDownloadUrl(code: string): Promise<{ success: boolean; url?: string; error?: string }> {
-    const cleanCode = code.replace(/\D/g, '');
+    const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from(TABLE_NAME)
           .select('*')
-          .eq('code', cleanCode)
+          .eq('transfer_code', cleanCode)
+          .eq('status', 'active')
           .single();
 
         if (error || !data) {
-          return { success: false, error: 'File record not found.' };
+          return { success: false, error: 'File record not found or no longer active.' };
         }
 
-        // Generate Supabase Signed URL (valid for 15 minutes)
+        // Generate Supabase Signed URL (valid for 15 minutes / 900 seconds)
         const { data: signedData, error: signedError } = await supabase.storage
           .from(STORAGE_BUCKET)
           .createSignedUrl(data.storage_path, 900, {
-            download: data.original_name,
+            download: data.filename,
           });
 
         if (signedError || !signedData?.signedUrl) {
-          // Fallback to public URL if signed URL fails or bucket is public
           const { data: pubData } = supabase.storage
             .from(STORAGE_BUCKET)
             .getPublicUrl(data.storage_path);
-          
+
           if (pubData?.publicUrl) {
             return { success: true, url: pubData.publicUrl };
           }
           return { success: false, error: signedError?.message || 'Failed to generate download link.' };
         }
 
-        // Increment download count
+        // Increment download count and set last_downloaded_at timestamp
+        const nowIso = new Date().toISOString();
         await supabase
           .from(TABLE_NAME)
-          .update({ downloads_count: (data.downloads_count || 0) + 1 })
-          .eq('code', cleanCode);
+          .update({
+            download_count: (data.download_count || 0) + 1,
+            last_downloaded_at: nowIso,
+          })
+          .eq('transfer_code', cleanCode);
 
         return { success: true, url: signedData.signedUrl };
       } catch (err: any) {
@@ -222,19 +307,26 @@ export const transferService = {
     if (!item) {
       return { success: false, error: 'File binary unavailable.' };
     }
+
     item.meta.downloadsCount = (item.meta.downloadsCount || 0) + 1;
+    item.meta.lastDownloadedAt = Date.now();
+
     const url = URL.createObjectURL(item.blob);
     return { success: true, url };
   },
 
+  /**
+   * Get active transfers count
+   */
   async getActiveStats(): Promise<number> {
     if (isSupabaseConfigured && supabase) {
       try {
-        const now = Date.now();
+        const nowIso = new Date().toISOString();
         const { count } = await supabase
           .from(TABLE_NAME)
           .select('*', { count: 'exact', head: true })
-          .gt('expires_at', now);
+          .eq('status', 'active')
+          .gt('expires_at', nowIso);
         return count || 0;
       } catch (e) {
         return 0;
@@ -244,7 +336,7 @@ export const transferService = {
     const now = Date.now();
     let count = 0;
     for (const item of fallbackRegistry.values()) {
-      if (item.meta.expiresAt > now) count++;
+      if (item.meta.expiresAt > now && item.meta.status === 'active') count++;
     }
     return count;
   },
