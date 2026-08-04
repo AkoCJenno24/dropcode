@@ -206,16 +206,9 @@ export const transferService = {
         const createdAtMs = new Date(data.created_at).getTime();
         const lastDownloadedAtMs = data.last_downloaded_at ? new Date(data.last_downloaded_at).getTime() : null;
 
-        if (data.status !== 'active' || Date.now() >= expiresAtMs) {
-          // Update status to expired
-          if (data.status === 'active') {
-            await supabase
-              .from(TABLE_NAME)
-              .update({ status: 'expired' })
-              .eq('transfer_code', cleanCode);
-
-            await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
-          }
+        if (data.status !== 'active' || Date.now() >= expiresAtMs || (data.download_count && Number(data.download_count) >= 1)) {
+          // Immediately delete file from storage and database
+          await this.deleteTransfer(cleanCode);
           return { success: false, error: 'Transfer code not found or file expired.' };
         }
 
@@ -273,8 +266,9 @@ export const transferService = {
           .eq('status', 'active')
           .single();
 
-        if (error || !data) {
-          return { success: false, error: 'File record not found or no longer active.' };
+        if (error || !data || (data.download_count && Number(data.download_count) >= 1)) {
+          await this.deleteTransfer(cleanCode);
+          return { success: false, error: 'Transfer code not found or file expired.' };
         }
 
         // Generate Supabase Signed URL (valid for 15 minutes / 900 seconds)
@@ -337,12 +331,18 @@ export const transferService = {
           .from(TABLE_NAME)
           .select('storage_path')
           .eq('transfer_code', cleanCode)
-          .single();
+          .maybeSingle();
 
         if (data?.storage_path) {
           // Delete physical file from Supabase Storage
           await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
         }
+
+        // Mark status as 'deleted' and download_count = 1 to neutralize row immediately
+        await supabase
+          .from(TABLE_NAME)
+          .update({ status: 'deleted', download_count: 1 })
+          .eq('transfer_code', cleanCode);
 
         // Delete row from Supabase database table to free space
         await supabase.from(TABLE_NAME).delete().eq('transfer_code', cleanCode);
