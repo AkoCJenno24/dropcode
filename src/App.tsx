@@ -15,7 +15,6 @@ export function AppContent() {
   const [downloadCode, setDownloadCode] = useState<string>('');
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<SavedTransferItem[]>([]);
-  const [activeCount, setActiveCount] = useState(0);
 
   // Read URL parameters / Hash for direct code links
   useEffect(() => {
@@ -40,22 +39,6 @@ export function AppContent() {
     checkHashAndParams();
     window.addEventListener('hashchange', checkHashAndParams);
     return () => window.removeEventListener('hashchange', checkHashAndParams);
-  }, []);
-
-  // Fetch active transfers stats
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const count = await transferService.getActiveStats();
-        setActiveCount(count);
-      } catch (e) {
-        // quiet error handle
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   // Load history from localStorage
@@ -105,7 +88,6 @@ export function AppContent() {
       {/* Navigation Header */}
       <Header
         onOpenHowItWorks={() => setHowItWorksOpen(true)}
-        activeCount={activeCount}
       />
 
       {/* Main Container */}

@@ -3,10 +3,9 @@ import { ArrowLeftRight, HelpCircle, Zap } from 'lucide-react';
 
 interface HeaderProps {
   onOpenHowItWorks: () => void;
-  activeCount?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenHowItWorks, activeCount = 0 }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenHowItWorks }) => {
   return (
     <header className="w-full max-w-5xl mx-auto px-4 py-4 sm:py-6 flex items-center justify-between border-b border-slate-200/80 mb-6 sm:mb-8">
       {/* Brand Identity */}
@@ -29,13 +28,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenHowItWorks, activeCount = 
 
       {/* Action controls & status */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {activeCount > 0 && (
-          <span className="hidden lg:inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-3 py-1 rounded-full font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {activeCount} active transfer{activeCount > 1 ? 's' : ''}
-          </span>
-        )}
-
         <button
           onClick={onOpenHowItWorks}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs hover:border-slate-300 transition-all cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:outline-none"
