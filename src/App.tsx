@@ -41,8 +41,13 @@ export function AppContent() {
     return () => window.removeEventListener('hashchange', checkHashAndParams);
   }, []);
 
-  // Load history from localStorage
+  // Load history from localStorage & run periodic transfer cleanup
   useEffect(() => {
+    transferService.cleanupExpiredTransfers();
+    const interval = setInterval(() => {
+      transferService.cleanupExpiredTransfers();
+    }, 30000);
+
     try {
       const saved = localStorage.getItem('dropcode_history');
       if (saved) {
@@ -52,6 +57,8 @@ export function AppContent() {
         setHistoryItems(valid);
       }
     } catch (e) {}
+
+    return () => clearInterval(interval);
   }, []);
 
   const saveToHistory = (type: 'upload' | 'download', file: FileTransferMeta) => {

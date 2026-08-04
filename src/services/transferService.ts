@@ -47,6 +47,9 @@ export const transferService = {
     onProgress?: (percentage: number) => void,
     securityContext?: SecurityContext
   ): Promise<{ success: boolean; code?: string; file?: FileTransferMeta; error?: string }> {
+    // Trigger background sweep for expired or downloaded files
+    this.cleanupExpiredTransfers().catch(() => {});
+
     // 1. Strict File Validation (Max 100MB, restricted executable extensions)
     const validation = validateUploadFile(file);
     if (!validation.valid) {
@@ -183,12 +186,63 @@ export const transferService = {
   },
 
   /**
+   * Sweeps and removes all expired or downloaded transfers from Storage and Database
+   */
+  async cleanupExpiredTransfers(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) {
+      const now = Date.now();
+      for (const [code, item] of fallbackRegistry.entries()) {
+        if (now >= item.meta.expiresAt || item.meta.downloadsCount >= 1) {
+          fallbackRegistry.delete(code);
+        }
+      }
+      return;
+    }
+
+    try {
+      const nowIso = new Date().toISOString();
+      // Query all records where expires_at <= now OR download_count >= 1 OR status != 'active'
+      const { data: expiredList } = await supabase
+        .from(TABLE_NAME)
+        .select('id, transfer_code, storage_path')
+        .or(`expires_at.lte.${nowIso},download_count.gte.1,status.neq.active`);
+
+      if (expiredList && expiredList.length > 0) {
+        // Collect storage paths to remove from Supabase Storage
+        const paths = expiredList
+          .map((item) => item.storage_path)
+          .filter((p): p is string => Boolean(p));
+
+        if (paths.length > 0) {
+          await supabase.storage.from(STORAGE_BUCKET).remove(paths);
+        }
+
+        const ids = expiredList.map((item) => item.id);
+        const codes = expiredList.map((item) => item.transfer_code);
+
+        // Delete rows from database table
+        if (ids.length > 0) {
+          await supabase.from(TABLE_NAME).delete().in('id', ids);
+        }
+        if (codes.length > 0) {
+          await supabase.from(TABLE_NAME).delete().in('transfer_code', codes);
+        }
+      }
+    } catch (e) {
+      console.error('Expired transfers cleanup error:', e);
+    }
+  },
+
+  /**
    * Fetch transfer metadata by transfer code
    */
   async getFileInfo(
     code: string
   ): Promise<{ success: boolean; file?: FileTransferMeta; meta?: FileTransferMeta; error?: string }> {
     const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+    // Trigger background sweep for expired or downloaded files
+    this.cleanupExpiredTransfers().catch(() => {});
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -236,7 +290,7 @@ export const transferService = {
       return { success: false, error: 'Transfer code not found or file expired.' };
     }
 
-    if (Date.now() >= item.meta.expiresAt) {
+    if (Date.now() >= item.meta.expiresAt || item.meta.downloadsCount >= 1) {
       fallbackRegistry.delete(cleanCode);
       return { success: false, error: 'Transfer code not found or file expired.' };
     }
@@ -323,13 +377,14 @@ export const transferService = {
    */
   async deleteTransfer(code: string): Promise<boolean> {
     const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    if (!cleanCode) return false;
 
     if (isSupabaseConfigured && supabase) {
       try {
-        // Fetch storage path before deleting row
+        // Fetch storage path and id before deleting row
         const { data } = await supabase
           .from(TABLE_NAME)
-          .select('storage_path')
+          .select('id, storage_path')
           .eq('transfer_code', cleanCode)
           .maybeSingle();
 
@@ -338,13 +393,12 @@ export const transferService = {
           await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
         }
 
-        // Mark status as 'deleted' and download_count = 1 to neutralize row immediately
-        await supabase
-          .from(TABLE_NAME)
-          .update({ status: 'deleted', download_count: 1 })
-          .eq('transfer_code', cleanCode);
+        if (data?.id) {
+          // Delete row from Supabase database table by ID
+          await supabase.from(TABLE_NAME).delete().eq('id', data.id);
+        }
 
-        // Delete row from Supabase database table to free space
+        // Delete row from Supabase database table by transfer code
         await supabase.from(TABLE_NAME).delete().eq('transfer_code', cleanCode);
         return true;
       } catch (err) {
