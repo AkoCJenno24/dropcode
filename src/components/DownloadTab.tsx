@@ -89,13 +89,15 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
         setFileMeta(res.meta);
         showToast('File Found!', res.meta.originalName, 'success');
       } else {
-        const msg = res.error || 'Transfer code not found or expired.';
+        const msg = res.error || 'Transfer code does not exist or has already been downloaded.';
+        setFileMeta(null);
         setErrorMsg(msg);
         showToast('Lookup Failed', msg, 'error');
       }
     } catch (err: any) {
       setIsSearching(false);
-      const msg = err?.message || 'Failed to locate file.';
+      setFileMeta(null);
+      const msg = err?.message || 'Transfer code does not exist or has already been downloaded.';
       setErrorMsg(msg);
       showToast('Error', msg, 'error');
     }
@@ -121,13 +123,15 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
         showToast('Download Completed!', fileMeta.originalName, 'success');
         if (onDownloadSuccess) onDownloadSuccess(fileMeta);
       } else {
-        const msg = res.error || 'Failed to download file.';
+        const msg = res.error || 'Transfer code does not exist or has already been downloaded.';
+        setFileMeta(null);
         setErrorMsg(msg);
         showToast('Download Failed', msg, 'error');
       }
     } catch (err: any) {
       setIsDownloading(false);
-      const msg = err?.message || 'Error occurred during download.';
+      setFileMeta(null);
+      const msg = err?.message || 'Transfer code does not exist or has already been downloaded.';
       setErrorMsg(msg);
       showToast('Download Error', msg, 'error');
     }
