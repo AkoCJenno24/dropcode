@@ -15,6 +15,7 @@ import {
   Lock,
   Sparkles,
   Smartphone,
+  Clock,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatBytes, formatCode, getFileTypeInfo } from '../utils/formatters';
@@ -269,25 +270,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
           </div>
         </div>
 
-        {/* Live Expiration Countdown */}
-        <ExpirationTimer
-          expiresAt={uploadedFile.expiresAt}
-          onExpired={() => {
-            setErrorMsg('This transfer code has expired.');
-            showToast('Transfer Expired', 'The transfer code has reached its 30-minute limit.', 'warning');
-          }}
-        />
-
-        {/* Future Extensibility UI Slot Indicators */}
-        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-400 font-medium">
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Passcode protection: Off</span>
-          </div>
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
-            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-            <span>P2P Direct link: Ready</span>
-          </div>
+        {/* Expiration Note */}
+        <div className="flex items-center gap-2.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs text-slate-600 font-medium">
+          <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span>Your code will expire and file will be deleted if not downloaded within 30 minutes.</span>
         </div>
 
         {/* Reset / Action Buttons */}

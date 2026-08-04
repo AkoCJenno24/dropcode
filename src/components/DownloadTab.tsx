@@ -260,14 +260,11 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
                   </div>
                 </div>
 
-                {/* Expiration Timer */}
-                <ExpirationTimer
-                  expiresAt={fileMeta.expiresAt}
-                  onExpired={() => {
-                    setErrorMsg('This transfer has expired.');
-                    showToast('Expired', 'This transfer has expired.', 'warning');
-                  }}
-                />
+                {/* Expiration Note */}
+                <div className="flex items-center gap-2.5 p-3 bg-white/80 border border-slate-200/80 rounded-2xl text-xs text-slate-600 font-medium">
+                  <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Your code will expire and file will be deleted if not downloaded within 30 minutes.</span>
+                </div>
               </div>
             );
           })()}
