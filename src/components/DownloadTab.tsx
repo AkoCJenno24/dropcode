@@ -89,7 +89,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
         setFileMeta(res.meta);
         showToast('File Found!', res.meta.originalName, 'success');
       } else {
-        const msg = res.error || 'Transfer code does not exist or has already been downloaded.';
+        const msg = res.error || 'Transfer code not found or file expired.';
         setFileMeta(null);
         setErrorMsg(msg);
         showToast('Lookup Failed', msg, 'error');
@@ -97,7 +97,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
     } catch (err: any) {
       setIsSearching(false);
       setFileMeta(null);
-      const msg = err?.message || 'Transfer code does not exist or has already been downloaded.';
+      const msg = err?.message || 'Transfer code not found or file expired.';
       setErrorMsg(msg);
       showToast('Error', msg, 'error');
     }
@@ -123,7 +123,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
         showToast('Download Completed!', fileMeta.originalName, 'success');
         if (onDownloadSuccess) onDownloadSuccess(fileMeta);
       } else {
-        const msg = res.error || 'Transfer code does not exist or has already been downloaded.';
+        const msg = res.error || 'Transfer code not found or file expired.';
         setFileMeta(null);
         setErrorMsg(msg);
         showToast('Download Failed', msg, 'error');
@@ -131,7 +131,7 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
     } catch (err: any) {
       setIsDownloading(false);
       setFileMeta(null);
-      const msg = err?.message || 'Transfer code does not exist or has already been downloaded.';
+      const msg = err?.message || 'Transfer code not found or file expired.';
       setErrorMsg(msg);
       showToast('Download Error', msg, 'error');
     }
@@ -197,8 +197,8 @@ export const DownloadTab: React.FC<DownloadTabProps> = ({
                 </>
               ) : (
                 <>
-                  <Search className="w-4 h-4" />
-                  <span>Locate File</span>
+                  <DownloadCloud className="w-4 h-4" />
+                  <span>Download File</span>
                 </>
               )}
             </button>

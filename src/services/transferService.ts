@@ -199,7 +199,7 @@ export const transferService = {
           .single();
 
         if (error || !data) {
-          return { success: false, error: 'Transfer code does not exist or has already been downloaded.' };
+          return { success: false, error: 'Transfer code not found or file expired.' };
         }
 
         const expiresAtMs = new Date(data.expires_at).getTime();
@@ -216,7 +216,7 @@ export const transferService = {
 
             await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
           }
-          return { success: false, error: 'Transfer code does not exist or has already been downloaded.' };
+          return { success: false, error: 'Transfer code not found or file expired.' };
         }
 
         const meta: FileTransferMeta = {
@@ -240,12 +240,12 @@ export const transferService = {
     // Fallback mode
     const item = fallbackRegistry.get(cleanCode);
     if (!item) {
-      return { success: false, error: 'Transfer code does not exist or has already been downloaded.' };
+      return { success: false, error: 'Transfer code not found or file expired.' };
     }
 
     if (Date.now() >= item.meta.expiresAt) {
       fallbackRegistry.delete(cleanCode);
-      return { success: false, error: 'Transfer code does not exist or has already been downloaded.' };
+      return { success: false, error: 'Transfer code not found or file expired.' };
     }
 
     return { success: true, file: item.meta, meta: item.meta };
@@ -369,7 +369,7 @@ export const transferService = {
 
     const metaRes = await this.getFileInfo(code);
     if (!metaRes.success || !metaRes.meta) {
-      return { success: false, error: metaRes.error || 'Transfer code invalid, expired, or already downloaded.' };
+      return { success: false, error: metaRes.error || 'Transfer code not found or file expired.' };
     }
 
     const res = await this.getDownloadUrl(code);
