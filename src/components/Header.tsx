@@ -1,6 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, HelpCircle, ShieldCheck, Zap, Server } from 'lucide-react';
-import { transferService } from '../services/transferService';
+import { ArrowLeftRight, HelpCircle, Zap } from 'lucide-react';
 
 interface HeaderProps {
   onOpenHowItWorks: () => void;
@@ -8,8 +7,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenHowItWorks, activeCount = 0 }) => {
-  const isCloudConfigured = transferService.isConfigured();
-
   return (
     <header className="w-full max-w-5xl mx-auto px-4 py-4 sm:py-6 flex items-center justify-between border-b border-slate-200/80 mb-6 sm:mb-8">
       {/* Brand Identity */}
@@ -32,14 +29,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenHowItWorks, activeCount = 
 
       {/* Action controls & status */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Backend Connectivity Status Badge */}
-        <div className="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100/80 border border-slate-200 text-slate-700">
-          <span className={`w-2 h-2 rounded-full ${isCloudConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-          <span className="text-[11px]">
-            {isCloudConfigured ? 'Supabase Backend Active' : 'Local Fallback Mode'}
-          </span>
-        </div>
-
         {activeCount > 0 && (
           <span className="hidden lg:inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-3 py-1 rounded-full font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
