@@ -325,38 +325,95 @@ export const transferService = {
   },
 
   /**
-   * Complete download process with progress tracking
+   * Delete transfer file from storage and record from database after use/expiration
+   */
+  async deleteTransfer(code: string): Promise<boolean> {
+    const cleanCode = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // Fetch storage path before deleting row
+        const { data } = await supabase
+          .from(TABLE_NAME)
+          .select('storage_path')
+          .eq('transfer_code', cleanCode)
+          .single();
+
+        if (data?.storage_path) {
+          // Delete physical file from Supabase Storage
+          await supabase.storage.from(STORAGE_BUCKET).remove([data.storage_path]);
+        }
+
+        // Delete row from Supabase database table to free space
+        await supabase.from(TABLE_NAME).delete().eq('transfer_code', cleanCode);
+        return true;
+      } catch (err) {
+        console.error('Error removing transfer after download:', err);
+        return false;
+      }
+    }
+
+    // Local fallback mode
+    fallbackRegistry.delete(cleanCode);
+    return true;
+  },
+
+  /**
+   * Complete download process with progress tracking and automatic cleanup
    */
   async downloadFile(
     code: string,
     onProgress?: (percentage: number) => void
   ): Promise<{ success: boolean; error?: string }> {
-    if (onProgress) onProgress(20);
+    if (onProgress) onProgress(15);
+
+    const metaRes = await this.getFileInfo(code);
+    if (!metaRes.success || !metaRes.meta) {
+      return { success: false, error: metaRes.error || 'Transfer code invalid, expired, or already downloaded.' };
+    }
 
     const res = await this.getDownloadUrl(code);
     if (!res.success || !res.url) {
       return { success: false, error: res.error || 'Failed to retrieve download link.' };
     }
 
-    if (onProgress) onProgress(60);
+    if (onProgress) onProgress(40);
 
     try {
-      // Trigger file download using temporary anchor tag
-      const metaRes = await this.getFileInfo(code);
-      const filename = metaRes.meta?.originalName || `dropcode_${code}.bin`;
+      const filename = metaRes.meta.originalName || `dropcode_${code}.bin`;
 
+      // Fetch file as Blob so it is fully downloaded before deleting from server
+      const fileResponse = await fetch(res.url);
+      if (!fileResponse.ok) {
+        throw new Error('Failed to retrieve file content.');
+      }
+
+      if (onProgress) onProgress(80);
+
+      const blob = await fileResponse.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Trigger user file download
       const link = document.createElement('a');
-      link.href = res.url;
+      link.href = blobUrl;
       link.download = filename;
-      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 10000);
+
       if (onProgress) onProgress(100);
+
+      // Automatically remove file from Storage and Database immediately after use
+      await this.deleteTransfer(code);
+
       return { success: true };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to initiate download.' };
+      console.error('Download execution error:', e);
+      return { success: false, error: e?.message || 'Failed to complete download.' };
     }
   },
 
