@@ -162,7 +162,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
             <Check className="w-6 h-6 stroke-[2.5]" />
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Ready to Transfer!
+            Your transfer is ready!
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
             Enter this code on your target device or scan the QR code to download instantly.
