@@ -386,7 +386,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
           {isUploading && (
             <div className="space-y-2.5">
               <div className="flex justify-between text-xs font-bold text-slate-800">
-                <span>Uploading to secure storage...</span>
+                <span>Generating transfer code...</span>
                 <span>{uploadProgress}%</span>
               </div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/60">
